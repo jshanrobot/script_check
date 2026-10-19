@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>원고 비교 프로그램</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f7; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; margin-top: 0; }
+        .section { margin-bottom: 24px; }
+        label { font-weight: bold; display: block; margin-bottom: 8px; }
+        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; resize: vertical; }
+        .orig-item { margin-bottom: 12px; padding: 12px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px; }
+        .btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .btn-primary { background-color: #0070f3; color: white; width: 100%; margin-top: 10px; }
+        .btn-secondary { background-color: #e0e0e0; color: #333; margin-top: 8px; }
+        .btn-remove { background-color: #ff4d4f; color: white; padding: 4px 8px; font-size: 12px; float: right; }
+        .result-box { margin-top: 24px; padding: 16px; border: 1px solid #eee; border-radius: 6px; background-color: #fff; }
+        mark { background-color: #ffe58f; font-weight: bold; padding: 2px 0; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>원고 비교 프로그램</h1>
+        
+        <div class="section">
+            <label for="corrected">교정본 입력</label>
+            <textarea id="corrected" placeholder="교정본 텍스트를 입력하세요."></textarea>
+        </div>
+
+        <div class="section">
+            <label>원본 입력 (여러 버전 지원)</label>
+            <div id="originals-container">
+                <div class="orig-item">
+                    <span>원본 (1)</span>
+                    <textarea class="orig-text" placeholder="원본 버전 1을 입력하세요."></textarea>
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addOriginalField()">+ 원본 버전 추가</button>
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="runComparison()">비교 실행하기</button>
+
+        <div id="results" class="result-box" style="display: none;">
+            <h2>비교 결과</h2>
+            <div id="corrected-output"></div>
+            <hr>
+            <div id="originals-output"></div>
+        </div>
+    </div>
+
+    <script>
+        let origCount = 1;
+
+        function addOriginalField() {
+            origCount++;
+            const container = document.getElementById('originals-container');
+            const div = document.createElement('div');
+            div.className = 'orig-item';
+            div.innerHTML = `
+                <button type="button" class="btn btn-remove" onclick="this.parentElement.remove()">삭제</button>
+                <span>원본 버전</span>
+                <textarea class="orig-text" placeholder="원본 버전을 입력하세요."></textarea>
+            `;
+            container.appendChild(div);
+        }
+
+        async function runComparison() {
+            const corrected = document.getElementById('corrected').value;
+            const origTextareas = document.querySelectorAll('.orig-text');
+            const originals = Array.from(origTextareas).map(ta => ta.value).filter(val => val.trim() !== '');
+
+            if (!corrected.trim() || originals.length === 0) {
+                alert('교정본과 최소 1개 이상의 원본을 입력해 주세요.');
+                return;
+            }
+
+            const response = await fetch('/api/compare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ corrected, originals })
+            });
+
+            const data = await response.json();
+
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('corrected-output').innerHTML = `<h3>교정본</h3><p>${data.corrected}</p>`;
+            
+            const origOutput = document.getElementById('originals-output');
+            origOutput.innerHTML = '';
+            data.results.forEach(res => {
+                origOutput.innerHTML += `
+                    <h3>원본 (${res.version})</h3>
+                    <p>${res.highlighted_text}</p>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
